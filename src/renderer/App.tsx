@@ -4,7 +4,7 @@ import {
   Shuffle, Repeat, Repeat1, Volume2, SlidersHorizontal, Minus, Square, X,
   RotateCcw, Disc3, Waves, Zap, Moon, Radio, LoaderCircle, ListMusic, Trash2, ListX, FileText,
   AudioLines, Activity, Sparkles, Gauge, AudioWaveform, Wind, Repeat2, RadioTower, VolumeX, Hand,
-  Palette, ChevronDown, ChevronRight, Check, Sun,
+  Palette, ChevronDown, ChevronRight, Check, Sun, MessageSquare, Send,
 } from 'lucide-react';
 import type { TrackMeta } from '../types';
 import { AudioEngine } from './audio/AudioEngine';
@@ -191,6 +191,11 @@ export default function App() {
   const [status, setStatus] = useState('就绪 · 拖入音频文件即可播放');
   const [version, setVersion] = useState('');
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackType, setFeedbackType] = useState('问题反馈（Bug）');
+  const [feedbackDetail, setFeedbackDetail] = useState('');
+  const [feedbackContact, setFeedbackContact] = useState('');
+  const [sendingFeedback, setSendingFeedback] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const [pendingPlayPath, setPendingPlayPath] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<{ path: string; x: number; y: number; confirmClear?: boolean } | null>(null);
@@ -474,6 +479,34 @@ export default function App() {
       setStatus('检查更新失败');
     } finally {
       setCheckingUpdate(false);
+    }
+  }
+
+  // 反馈：表单内容经主进程转发到作者邮箱，无需注册账号
+  async function submitFeedback() {
+    const detail = feedbackDetail.trim();
+    if (!detail) { setStatus('请先填写反馈内容'); return; }
+    if (sendingFeedback) return;
+    setSendingFeedback(true);
+    setStatus('正在发送反馈…');
+    try {
+      const result = await window.beatfx.sendFeedback({
+        type: feedbackType,
+        detail,
+        contact: feedbackContact.trim(),
+      });
+      if (result.ok) {
+        setStatus('反馈已发送，感谢你的意见');
+        setFeedbackDetail('');
+        setFeedbackContact('');
+        setFeedbackOpen(false);
+      } else {
+        setStatus(`发送失败：${result.error || '未知错误'}`);
+      }
+    } catch {
+      setStatus('发送失败，请检查网络后重试');
+    } finally {
+      setSendingFeedback(false);
     }
   }
 
@@ -1235,10 +1268,7 @@ export default function App() {
               disabled={checkingUpdate} title="检查 GitHub 发布页是否有新版本">
               {checkingUpdate ? '检查中…' : '检查更新'}
             </button>
-            <button className="check-update" onClick={() => {
-              setStatus('正在打开反馈页面…');
-              window.beatfx.openFeedback().then(() => setStatus('已打开反馈页面，欢迎提交意见')).catch(() => setStatus('打开反馈页面失败'));
-            }} title="打开 GitHub 反馈页面，提交问题或建议">
+            <button className="check-update" onClick={() => setFeedbackOpen(true)} title="提交问题或建议，无需注册账号">
               反馈意见
             </button>
           </div>
@@ -1413,6 +1443,49 @@ export default function App() {
             <div className="modal-actions">
               <button onClick={() => setLyricEditor(null)}>取消</button>
               <button className="primary" onClick={saveLyrics}>保存歌词</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {feedbackOpen && (
+        <div className="modal-backdrop"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) setFeedbackOpen(false); }}>
+          <div className="feedback-modal" role="dialog" aria-modal="true" aria-label="反馈意见">
+            <div className="modal-head">
+              <div>
+                <MessageSquare size={17} />
+                <strong>反馈意见</strong>
+              </div>
+              <button className="modal-close" onClick={() => setFeedbackOpen(false)} title="关闭"><X size={16} /></button>
+            </div>
+            <div className="feedback-help">无需注册账号，填写后直接发送给作者。你的意见会被认真阅读。</div>
+            <div className="feedback-types">
+              {['问题反馈（Bug）', '功能建议', '其他'].map((t) => (
+                <button key={t} className={feedbackType === t ? 'active' : ''}
+                  onClick={() => setFeedbackType(t)}>{t}</button>
+              ))}
+            </div>
+            <textarea
+              className="feedback-input"
+              value={feedbackDetail}
+              onChange={(event) => setFeedbackDetail(event.target.value)}
+              placeholder={'请描述你遇到的问题或希望新增的功能…\n\n如果是 Bug，建议附上操作步骤。'}
+              autoFocus
+            />
+            <input
+              className="feedback-contact"
+              type="text"
+              value={feedbackContact}
+              onChange={(event) => setFeedbackContact(event.target.value)}
+              placeholder="联系方式（选填，邮箱或 QQ，方便回复你）"
+            />
+            <div className="feedback-meta">发送时会自动附带 BeatFX 版本与系统信息，帮助定位问题。</div>
+            <div className="modal-actions">
+              <button onClick={() => window.beatfx.openFeedback()}>用 GitHub 提交</button>
+              <button className="primary" onClick={submitFeedback} disabled={sendingFeedback}>
+                <Send size={13} /> {sendingFeedback ? '发送中…' : '发送反馈'}
+              </button>
             </div>
           </div>
         </div>

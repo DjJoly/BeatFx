@@ -4,13 +4,16 @@ import * as fs from 'fs';
 import * as crypto from 'crypto';
 import * as https from 'https';
 import { spawn } from 'child_process';
-import type { TrackMeta, OpenResult, RevealResult, LyricsSaveResult, UpdateInfo } from './types';
+import type { TrackMeta, OpenResult, RevealResult, LyricsSaveResult, UpdateInfo, FeedbackPayload, FeedbackResult } from './types';
 
 // 发布仓库：建好 GitHub 仓库后只需改这里（owner/repo），发布页与检查更新都用它。
 // 例如仓库地址是 https://github.com/Joly/beatfx，就写 'Joly/beatfx'。
 const GITHUB_REPO = 'DjJoly/BeatFx';
 const RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases`;
 const ISSUES_URL = `https://github.com/${GITHUB_REPO}/issues/new/choose`;
+// formsubmit.co 激活后分配的随机字符串别名，等价于收件邮箱但不会在源码/包里暴露真实邮箱。
+// 用户填写反馈后经 formsubmit.co 免费转发，实时到达收件箱。
+const FEEDBACK_ENDPOINT = '0c68afbd757ba2fbc5b10437b9a23481';
 
 // 反馈入口：打开 GitHub 新建 issue，预填模板并带上版本/系统信息，便于后续自动归类处理。
 function buildFeedbackUrl(): string {
@@ -34,6 +37,55 @@ function buildFeedbackUrl(): string {
     `系统：${os}`,
   ].join('\n');
   return `https://github.com/${GITHUB_REPO}/issues/new?body=${encodeURIComponent(body)}`;
+}
+
+// 把用户反馈经 formsubmit.co 免费转发到收件邮箱，无需注册、实时到达。
+async function sendFeedback(payload: FeedbackPayload): Promise<FeedbackResult> {
+  const os = process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : process.platform;
+  const body = JSON.stringify({
+    _subject: `BeatFX 反馈 · ${payload.type}`,
+    _replyto: payload.contact || '未提供',
+    反馈类型: payload.type,
+    联系方式: payload.contact || '未提供',
+    反馈内容: payload.detail,
+    版本: `v${app.getVersion()}`,
+    系统: os,
+  });
+  try {
+    const raw = await new Promise<string>((resolve, reject) => {
+      const req = https.request(`https://formsubmit.co/ajax/${FEEDBACK_ENDPOINT}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Origin: 'https://formsubmit.co',
+          Referer: 'https://formsubmit.co/',
+          'User-Agent': 'BeatFX-Feedback/1.0',
+          'Content-Length': Buffer.byteLength(body),
+        },
+        timeout: 15000,
+      }, (res) => {
+        let data = '';
+        res.setEncoding('utf8');
+        res.on('data', (chunk) => { data += chunk; if (data.length > 10000) req.destroy(new Error('响应过大')); });
+        res.on('end', () => {
+          if ((res.statusCode || 0) >= 200 && (res.statusCode || 0) < 300) resolve(data);
+          else reject(new Error(`HTTP ${res.statusCode}: ${data.slice(0, 200)}`));
+        });
+      });
+      req.on('timeout', () => req.destroy(new Error('连接超时，请检查网络')));
+      req.on('error', reject);
+      req.write(body);
+      req.end();
+    });
+    // formsubmit 即使拒绝也返回 HTTP 200，必须解析 body 里的 success 字段判断真实结果。
+    let result: { success?: string | boolean; message?: string } = {};
+    try { result = JSON.parse(raw); } catch { /* 非 JSON 视为失败 */ }
+    if (result.success === true || result.success === 'true') return { ok: true };
+    return { ok: false, error: result.message || '表单提交被拒绝' };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 // 让应用（含系统原生文件选择框）优先使用中文，而不是跟随系统的英文界面
@@ -409,6 +461,7 @@ ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('update:check', () => checkForUpdate());
 ipcMain.handle('update:open', () => shell.openExternal(RELEASES_URL));
 ipcMain.handle('feedback:open', () => shell.openExternal(buildFeedbackUrl()));
+ipcMain.handle('feedback:send', (_event, payload: FeedbackPayload) => sendFeedback(payload));
 
 // Right-click "Open file location" from the library list.
 ipcMain.handle('file:reveal', async (_event, filePath: string): Promise<RevealResult> => {

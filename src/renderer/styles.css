@@ -464,6 +464,43 @@ input[type="range"]::-webkit-slider-thumb {
   background: linear-gradient(135deg, var(--pink), #ff5a7a);
 }
 .modal-actions button.primary:hover { filter: brightness(1.1); }
+.modal-actions button:disabled { opacity: 0.55; cursor: default; }
+
+.feedback-modal {
+  width: min(520px, calc(100vw - 64px));
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid rgb(var(--fg-rgb) / 0.12);
+  border-radius: 16px;
+  background: var(--surface-solid);
+  box-shadow: 0 30px 80px rgb(var(--shadow-rgb) / 0.65);
+}
+.feedback-help { margin: -2px 2px 14px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.feedback-types { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 12px; }
+.feedback-types button {
+  padding: 6px 12px; border-radius: 8px; font-size: 11px;
+  border: 1px solid var(--line); background: rgb(var(--fg-rgb) / 0.04); color: var(--muted);
+}
+.feedback-types button:hover { color: var(--text); }
+.feedback-types button.active { border-color: var(--cyan); color: var(--cyan-text); background: rgb(var(--fg-rgb) / 0.08); }
+.feedback-input {
+  width: 100%; min-height: 170px; resize: vertical;
+  padding: 12px 14px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--input-bg); color: var(--text);
+  font: 12px/1.7 inherit; outline: none;
+}
+.feedback-input:focus { border-color: rgba(37,244,238,0.55); box-shadow: 0 0 0 3px rgba(37,244,238,0.08); }
+.feedback-input::placeholder { color: var(--faint-2); }
+.feedback-contact {
+  width: 100%; margin-top: 10px; padding: 10px 14px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--input-bg); color: var(--text);
+  font: 12px inherit; outline: none;
+}
+.feedback-contact:focus { border-color: rgba(37,244,238,0.55); }
+.feedback-contact::placeholder { color: var(--faint-2); }
+.feedback-meta { margin: 10px 2px 0; color: var(--faint-2); font-size: 10px; line-height: 1.5; }
+.modal-actions button.primary svg { vertical-align: -2px; margin-right: 3px; }
 
 /* DJ 打碟机效果器 */
 .dj-section .dj-tip { margin: -4px 0 10px; color: var(--faint); font-size: 9.5px; }

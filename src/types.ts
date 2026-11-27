@@ -35,6 +35,17 @@ export interface UpdateInfo {
   error?: string;
 }
 
+export interface FeedbackPayload {
+  type: string;
+  detail: string;
+  contact: string;
+}
+
+export interface FeedbackResult {
+  ok: boolean;
+  error?: string;
+}
+
 export interface BeatFXApi {
   openFiles(): Promise<OpenResult>;
   openFolder(): Promise<OpenResult>;
@@ -50,6 +61,7 @@ export interface BeatFXApi {
   checkUpdate(): Promise<UpdateInfo>;
   openReleases(): Promise<void>;
   openFeedback(): Promise<void>;
+  sendFeedback(payload: FeedbackPayload): Promise<FeedbackResult>;
   platform: string;
   onFilesDropped(callback: (paths: string[]) => void): void;
   onFilesOpen(callback: (paths: string[]) => void): void;
