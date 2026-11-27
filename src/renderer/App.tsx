@@ -1235,6 +1235,12 @@ export default function App() {
               disabled={checkingUpdate} title="检查 GitHub 发布页是否有新版本">
               {checkingUpdate ? '检查中…' : '检查更新'}
             </button>
+            <button className="check-update" onClick={() => {
+              setStatus('正在打开反馈页面…');
+              window.beatfx.openFeedback().then(() => setStatus('已打开反馈页面，欢迎提交意见')).catch(() => setStatus('打开反馈页面失败'));
+            }} title="打开 GitHub 反馈页面，提交问题或建议">
+              反馈意见
+            </button>
           </div>
         </main>
 

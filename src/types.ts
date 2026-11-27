@@ -49,6 +49,7 @@ export interface BeatFXApi {
   getVersion(): Promise<string>;
   checkUpdate(): Promise<UpdateInfo>;
   openReleases(): Promise<void>;
+  openFeedback(): Promise<void>;
   platform: string;
   onFilesDropped(callback: (paths: string[]) => void): void;
   onFilesOpen(callback: (paths: string[]) => void): void;

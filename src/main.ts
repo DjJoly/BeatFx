@@ -10,6 +10,31 @@ import type { TrackMeta, OpenResult, RevealResult, LyricsSaveResult, UpdateInfo 
 // 例如仓库地址是 https://github.com/Joly/beatfx，就写 'Joly/beatfx'。
 const GITHUB_REPO = 'DjJoly/BeatFx';
 const RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases`;
+const ISSUES_URL = `https://github.com/${GITHUB_REPO}/issues/new/choose`;
+
+// 反馈入口：打开 GitHub 新建 issue，预填模板并带上版本/系统信息，便于后续自动归类处理。
+function buildFeedbackUrl(): string {
+  const os = process.platform === 'darwin' ? 'macOS' : process.platform === 'win32' ? 'Windows' : process.platform;
+  const body = [
+    '### 反馈类型',
+    '- [ ] 问题反馈（Bug）',
+    '- [ ] 功能建议',
+    '- [ ] 其他',
+    '',
+    '### 详细描述',
+    '请说明你遇到的问题或希望新增的功能：',
+    '',
+    '',
+    '### 复现步骤（Bug 请填写）',
+    '1. ',
+    '2. ',
+    '',
+    '---',
+    `版本：v${app.getVersion()}`,
+    `系统：${os}`,
+  ].join('\n');
+  return `https://github.com/${GITHUB_REPO}/issues/new?body=${encodeURIComponent(body)}`;
+}
 
 // 让应用（含系统原生文件选择框）优先使用中文，而不是跟随系统的英文界面
 app.commandLine.appendSwitch('lang', 'zh-CN');
@@ -383,6 +408,7 @@ ipcMain.on('window:action', (_event, action: string) => {
 ipcMain.handle('app:version', () => app.getVersion());
 ipcMain.handle('update:check', () => checkForUpdate());
 ipcMain.handle('update:open', () => shell.openExternal(RELEASES_URL));
+ipcMain.handle('feedback:open', () => shell.openExternal(buildFeedbackUrl()));
 
 // Right-click "Open file location" from the library list.
 ipcMain.handle('file:reveal', async (_event, filePath: string): Promise<RevealResult> => {

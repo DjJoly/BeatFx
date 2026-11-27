@@ -21,6 +21,7 @@ const api: BeatFXApi = {
   getVersion: () => ipcRenderer.invoke('app:version'),
   checkUpdate: () => ipcRenderer.invoke('update:check'),
   openReleases: () => ipcRenderer.invoke('update:open'),
+  openFeedback: () => ipcRenderer.invoke('feedback:open'),
   platform: process.platform,
   onFilesDropped: (callback) => {
     ipcRenderer.on('files:dropped', (_event, paths: string[]) => callback(paths));
