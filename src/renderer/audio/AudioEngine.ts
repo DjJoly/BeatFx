@@ -62,11 +62,24 @@ export class AudioEngine {
   private compressor!: DynamicsCompressorNode;
   private loudnessComp!: GainNode;   // offsets low-end boost so the compressor does not pump
   private analyserNode!: AnalyserNode;
-  private surroundPanner!: PannerNode;   // HRTF panner that orbits around the listener
+  // Surround uses two parallel paths so the orbit is audible on ordinary
+  // left/right speakers as well as headphones:
+  //   - StereoPanner sweeps the source left -> right -> left (the main cue
+  //     speakers can reproduce)
+  //   - HRTF PannerNode orbits in X/Z for headphone 3D placement
+  // A cosine LFO also dulls and attenuates the wet path when the source is
+  // behind the listener, which is how we perceive "back" on speakers.
+  private surroundPanner!: PannerNode;
+  private surroundStereo!: StereoPannerNode;
+  private surroundTone!: BiquadFilterNode;
   private surroundDry!: GainNode;
-  private surroundWet!: GainNode;
+  private surroundHrtfWet!: GainNode;
+  private surroundStereoWet!: GainNode;
   private surroundOscX!: OscillatorNode;
   private surroundOscZ!: OscillatorNode;
+  private surroundPanDepth!: GainNode;
+  private surroundToneDepth!: GainNode;
+  private surroundRearDepth!: GainNode;
   private surroundRate = 0;
   private master!: GainNode;
   private bassDb = 0;
@@ -305,9 +318,11 @@ export class AudioEngine {
     this.analyserNode.fftSize = 2048;
     this.analyserNode.smoothingTimeConstant = 0.82;
 
-    // ---- Surround: an HRTF panner whose source orbits the listener --------
-    // Two quadrature LFOs drive the X/Z position so the sound travels a full
-    // circle (front -> side -> back -> side) instead of merely bouncing L/R.
+    // ---- Surround: an orbiting source audible on BOTH speakers and phones --
+    // Two quadrature LFOs (sine on X, cosine on Z) move the source in a full
+    // circle. The X LFO also drives a StereoPanner, which is what ordinary
+    // left/right speakers actually reproduce as "the sound is circling me".
+    // The HRTF panner adds front/back placement for headphone listeners.
     this.surroundPanner = ctx.createPanner();
     this.surroundPanner.panningModel = 'HRTF';
     this.surroundPanner.distanceModel = 'inverse';
@@ -318,12 +333,27 @@ export class AudioEngine {
     this.surroundPanner.positionX.value = 0;
     this.surroundPanner.positionZ.value = 0;
 
+    // Stereo sweep: the main cue for speakers. pan = sine of the orbit angle.
+    this.surroundStereo = ctx.createStereoPanner();
+    this.surroundStereo.pan.value = 0;
+
+    // When the source is behind the listener, real-world sound reaches us
+    // duller and softer. A cosine-driven lowpass + gain gives that "back"
+    // cue on speakers, where HRTF alone does almost nothing.
+    this.surroundTone = ctx.createBiquadFilter();
+    this.surroundTone.type = 'lowpass';
+    this.surroundTone.frequency.value = 12000;
+    this.surroundTone.Q.value = 0.5;
+
     this.surroundOscX = ctx.createOscillator();
     this.surroundOscX.type = 'sine';
     this.surroundOscX.frequency.value = 0.11; // ~9 s per revolution
     const orbitXGain = ctx.createGain();
     orbitXGain.gain.value = 2.2; // orbit radius
     this.surroundOscX.connect(orbitXGain).connect(this.surroundPanner.positionX);
+    this.surroundPanDepth = ctx.createGain();
+    this.surroundPanDepth.gain.value = 0;
+    this.surroundOscX.connect(this.surroundPanDepth).connect(this.surroundStereo.pan);
     this.surroundOscX.start();
 
     this.surroundOscZ = ctx.createOscillator();
@@ -334,11 +364,20 @@ export class AudioEngine {
     const orbitZGain = ctx.createGain();
     orbitZGain.gain.value = 2.2;
     this.surroundOscZ.connect(orbitZGain).connect(this.surroundPanner.positionZ);
+    this.surroundToneDepth = ctx.createGain();
+    this.surroundToneDepth.gain.value = 0;
+    this.surroundOscZ.connect(this.surroundToneDepth).connect(this.surroundTone.frequency);
+    this.surroundRearDepth = ctx.createGain();
+    this.surroundRearDepth.gain.value = 0;
+    this.surroundOscZ.connect(this.surroundRearDepth); // -> surroundStereoWet.gain once created
     this.surroundOscZ.start();
 
     this.surroundDry = ctx.createGain();
-    this.surroundWet = ctx.createGain();
-    this.surroundWet.gain.value = 0;
+    this.surroundHrtfWet = ctx.createGain();
+    this.surroundHrtfWet.gain.value = 0;
+    this.surroundStereoWet = ctx.createGain();
+    this.surroundStereoWet.gain.value = 0;
+    this.surroundRearDepth.connect(this.surroundStereoWet.gain);
 
     this.master = ctx.createGain();
 
@@ -387,11 +426,12 @@ export class AudioEngine {
     this.passB.connect(this.merger, 0, 1);
     this.merger.connect(this.vocalWet).connect(this.compressor);
 
-    // Final mix: keep the original stereo (dry) and add an orbiting HRTF copy
-    // (wet) so the source seems to travel around the head.
+    // Final mix: the dry original plus two orbiting copies. The stereo path
+    // is the one speakers reproduce; the HRTF path is the headphone bonus.
     this.compressor.connect(this.analyserNode);
     this.analyserNode.connect(this.surroundDry).connect(this.master);
-    this.analyserNode.connect(this.surroundPanner).connect(this.surroundWet).connect(this.master);
+    this.analyserNode.connect(this.surroundPanner).connect(this.surroundHrtfWet).connect(this.master);
+    this.analyserNode.connect(this.surroundTone).connect(this.surroundStereo).connect(this.surroundStereoWet).connect(this.master);
     this.master.connect(ctx.destination);
     this.sirenOsc.connect(this.sirenGain).connect(this.master);
     this.noiseSource.connect(this.noiseGain).connect(this.master);
@@ -508,19 +548,30 @@ export class AudioEngine {
   }
 
   /**
-   * Surround: blend in an HRTF-panned copy of the mix whose source orbits the
-   * listener, creating the impression of the song circling around the head.
-   * The orbit speed can be scaled (0 = off, 1 = normal ~9s/revolution).
+   * Surround: orbit a copy of the mix around the listener. The stereo sweep
+   * makes the motion audible on ordinary speakers; HRTF adds front/back
+   * placement on headphones; a cosine-driven tone/gain dip makes the source
+   * sound farther away when it is behind you.
+   * amount = 0 off, 1 = full ~9 s/revolution orbit.
    */
   setSurround(amount: number) {
     this.buildGraph();
     const a = clamp(amount, 0, 1);
     this.surroundRate = a;
     const t = this.ctx.currentTime;
-    // Keep the orbiting copy clearly below the original. A wet gain above the
-    // dry signal makes the same song sound like two tracks playing at once.
-    this.surroundWet.gain.setTargetAtTime(a * 0.42, t, 0.06);
-    this.surroundDry.gain.setTargetAtTime(1 - a * 0.12, t, 0.06);
+    // Make the orbiting copy clearly audible this time. The previous 0.42 wet
+    // under a near-full dry mix was buried and users heard no effect at all.
+    // We lower the dry a little to keep the sweep obvious without letting the
+    // same song sound like two competing tracks.
+    this.surroundDry.gain.setTargetAtTime(1 - a * 0.22, t, 0.06);
+    this.surroundStereoWet.gain.setTargetAtTime(a * 0.9, t, 0.06);
+    this.surroundHrtfWet.gain.setTargetAtTime(a * 0.35, t, 0.06);
+    // Stereo pan sweeps the full L/R range at maximum strength.
+    this.surroundPanDepth.gain.setTargetAtTime(a, t, 0.06);
+    // Behind (cosine = +1): lowpass closes from 12 kHz to 3 kHz and the wet
+    // copy drops by ~45%, so the source sounds like it moved behind you.
+    this.surroundToneDepth.gain.setTargetAtTime(-a * 9000, t, 0.06);
+    this.surroundRearDepth.gain.setTargetAtTime(-a * 0.4, t, 0.06);
     const speed = a > 0 ? 0.11 * (0.7 + a * 0.3) : 0;
     this.surroundOscX.frequency.setTargetAtTime(speed || 0.0001, t, 0.08);
     this.surroundOscZ.frequency.setTargetAtTime(speed || 0.0001, t, 0.08);
