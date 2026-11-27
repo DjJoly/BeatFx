@@ -4,6 +4,8 @@
 
 > 作者：Joly　·　版本：1.0.0　·　许可证：MIT（代码部分）
 
+![BeatFX 界面预览](docs/preview.png)
+
 ## 功能
 
 - **多格式播放**：MP3 / FLAC / WAV / M4A / AAC / OGG / APE / WMA / WV / DSD 等 20+ 种音频格式
