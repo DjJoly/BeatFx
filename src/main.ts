@@ -8,7 +8,7 @@ import type { TrackMeta, OpenResult, RevealResult, LyricsSaveResult, UpdateInfo 
 
 // 发布仓库：建好 GitHub 仓库后只需改这里（owner/repo），发布页与检查更新都用它。
 // 例如仓库地址是 https://github.com/Joly/beatfx，就写 'Joly/beatfx'。
-const GITHUB_REPO = 'Joly/beatfx';
+const GITHUB_REPO = 'DjJoly/BeatFx';
 const RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases`;
 
 // 让应用（含系统原生文件选择框）优先使用中文，而不是跟随系统的英文界面
