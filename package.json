@@ -1,0 +1,144 @@
+{
+  "name": "beatfx-player",
+  "version": "1.0.0",
+  "description": "BeatFX - a local music player with professional audio effects",
+  "main": "dist-electron/main.js",
+  "author": "BeatFX",
+  "license": "MIT",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.node.json && vite build",
+    "prepare:resources": "node scripts/copy-ffmpeg.js",
+    "dist:mac": "npm run build && npm run prepare:resources && electron-builder --mac --x64",
+    "dist:win": "npm run build && npm run prepare:resources && electron-builder --win --x64",
+    "dist:win:dir": "npm run build && npm run prepare:resources && electron-builder --win --x64 --dir"
+  },
+  "dependencies": {
+    "music-metadata": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "electron": "^37.0.0",
+    "electron-builder": "^25.1.8",
+    "ffmpeg-static": "^5.2.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.0.0"
+  },
+  "build": {
+    "electronDist": "node_modules/electron/dist",
+    "appId": "com.beatfx.player",
+    "productName": "BeatFX",
+    "fileAssociations": [
+      {
+        "ext": [
+          "mp3",
+          "wav",
+          "m4a",
+          "m4b",
+          "aac",
+          "ogg",
+          "oga",
+          "opus",
+          "flac",
+          "aiff",
+          "aif",
+          "ape",
+          "wma",
+          "wv",
+          "dsf",
+          "dff",
+          "mka",
+          "mp2",
+          "mp1",
+          "tta",
+          "mpc"
+        ],
+        "name": "BeatFX.Audio",
+        "description": "BeatFX",
+        "role": "Player"
+      }
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/music-metadata/**/*",
+      "node_modules/@borewit/**/*",
+      "node_modules/@tokenizer/**/*",
+      "node_modules/content-type/**/*",
+      "node_modules/media-typer/**/*",
+      "node_modules/debug/**/*",
+      "node_modules/ms/**/*",
+      "node_modules/file-type/**/*",
+      "node_modules/strtok3/**/*",
+      "node_modules/token-types/**/*",
+      "node_modules/ieee754/**/*",
+      "node_modules/uint8array-extras/**/*",
+      "node_modules/win-guid/**/*",
+      "node_modules/iconv-lite/**/*",
+      "node_modules/safer-buffer/**/*"
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "identity": null,
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.music",
+      "extendInfo": {
+        "CFBundleAllowMixedLocalizations": true,
+        "CFBundleLocalizations": [
+          "zh_CN",
+          "en"
+        ],
+        "AppleLanguages": [
+          "zh-CN",
+          "en"
+        ]
+      },
+      "extraResources": [
+        {
+          "from": "resources/ffmpeg-darwin-x64",
+          "to": "resources/ffmpeg-darwin-x64"
+        }
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.ico",
+      "extraResources": [
+        {
+          "from": "resources/ffmpeg-win32-x64.exe",
+          "to": "resources/ffmpeg-win32-x64.exe"
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "language": "2052",
+      "installerLanguages": [
+        "zh_CN",
+        "en_US"
+      ],
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "BeatFX",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
+    }
+  }
+}

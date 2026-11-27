@@ -1,0 +1,14 @@
+mp3	public.mp3	com.apple.Music
+m4a	com.apple.m4a-audio	com.apple.Music
+aac	public.aac-audio	com.apple.iBooksX
+flac	org.xiph.flac	com.tencent.QQMusicMac
+wav	com.microsoft.waveform-audio	com.apple.Music
+ogg	org.xiph.ogg-audio	com.google.Chrome
+opus	dyn.ah62d4rv4ge8086dzsq	com.beatfx.player
+aiff	public.aiff-audio	com.apple.Music
+aif	public.aiff-audio	com.apple.Music
+m4b	com.apple.protected-mpeg-4-audio-b	com.apple.iBooksX
+wma	com.microsoft.windows-media-wma	com.tencent.QQMusicMac
+ape	com.iqiyi.player.media.ext-ape	com.tencent.QQMusicMac
+mp2	public.mp2	com.apple.Music
+oga	org.xiph.ogg-audio	com.google.Chrome

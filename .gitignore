@@ -1,0 +1,18 @@
+# 依赖与构建产物
+node_modules/
+dist/
+dist-electron/
+release/
+
+# 本地二进制（由 npm install 的 ffmpeg-static 生成，不入库）
+resources/ffmpeg-*
+
+# 系统/编辑器
+.DS_Store
+*.log
+*.blockmap
+
+# 开发期留下的预览与临时文件
+icon-compare.html
+ui-preview.png
+index-*.js
