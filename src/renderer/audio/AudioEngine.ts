@@ -82,6 +82,7 @@ export class AudioEngine {
   private surroundRearDepth!: GainNode;
   private surroundRate = 0;
   private master!: GainNode;
+  private outputLimiter!: DynamicsCompressorNode;
   private bassDb = 0;
   private lowDb = 0;
   private graphReady = false;
@@ -219,6 +220,16 @@ export class AudioEngine {
     this.compressor.ratio.value = 3;
     this.compressor.attack.value = 0.02;
     this.compressor.release.value = 0.4;
+
+    // Final output limiter. The surround mix sums three correlated copies
+    // AFTER the safety compressor above, so without this stage the combined
+    // peak can exceed 1.0 and clip — heard as crackling / distortion.
+    this.outputLimiter = ctx.createDynamicsCompressor();
+    this.outputLimiter.threshold.value = -4;
+    this.outputLimiter.knee.value = 6;
+    this.outputLimiter.ratio.value = 12;
+    this.outputLimiter.attack.value = 0.003;
+    this.outputLimiter.release.value = 0.12;
 
     this.loudnessComp = ctx.createGain();
     this.loudnessComp.gain.value = 1;
@@ -432,7 +443,9 @@ export class AudioEngine {
     this.analyserNode.connect(this.surroundDry).connect(this.master);
     this.analyserNode.connect(this.surroundPanner).connect(this.surroundHrtfWet).connect(this.master);
     this.analyserNode.connect(this.surroundTone).connect(this.surroundStereo).connect(this.surroundStereoWet).connect(this.master);
-    this.master.connect(ctx.destination);
+    // All paths (dry + surround copies + DJ one-shots) converge at master;
+    // the limiter here is the last guard before the speakers.
+    this.master.connect(this.outputLimiter).connect(ctx.destination);
     this.sirenOsc.connect(this.sirenGain).connect(this.master);
     this.noiseSource.connect(this.noiseGain).connect(this.master);
     this.sirenOsc.start();
@@ -559,19 +572,20 @@ export class AudioEngine {
     const a = clamp(amount, 0, 1);
     this.surroundRate = a;
     const t = this.ctx.currentTime;
-    // Make the orbiting copy clearly audible this time. The previous 0.42 wet
-    // under a near-full dry mix was buried and users heard no effect at all.
-    // We lower the dry a little to keep the sweep obvious without letting the
-    // same song sound like two competing tracks.
-    this.surroundDry.gain.setTargetAtTime(1 - a * 0.22, t, 0.06);
-    this.surroundStereoWet.gain.setTargetAtTime(a * 0.9, t, 0.06);
-    this.surroundHrtfWet.gain.setTargetAtTime(a * 0.35, t, 0.06);
+    // Keep the orbiting copy clearly audible, but leave headroom: three
+    // correlated copies of the same song sum well above 1.0 otherwise. The
+    // output limiter catches the remainder without audible pumping.
+    this.surroundDry.gain.setTargetAtTime(1 - a * 0.24, t, 0.06);
+    this.surroundStereoWet.gain.setTargetAtTime(a * 0.78, t, 0.06);
+    this.surroundHrtfWet.gain.setTargetAtTime(a * 0.3, t, 0.06);
     // Stereo pan sweeps the full L/R range at maximum strength.
     this.surroundPanDepth.gain.setTargetAtTime(a, t, 0.06);
-    // Behind (cosine = +1): lowpass closes from 12 kHz to 3 kHz and the wet
-    // copy drops by ~45%, so the source sounds like it moved behind you.
-    this.surroundToneDepth.gain.setTargetAtTime(-a * 9000, t, 0.06);
-    this.surroundRearDepth.gain.setTargetAtTime(-a * 0.4, t, 0.06);
+    // Behind (cosine = +1): lowpass closes from 12 kHz to 4 kHz and the wet
+    // copy drops by ~41%, so the source sounds like it moved behind you.
+    // Capping the floor at 4 kHz also keeps the modulated biquad away from
+    // Nyquist, where it can ring and add its own crackle.
+    this.surroundToneDepth.gain.setTargetAtTime(-a * 8000, t, 0.06);
+    this.surroundRearDepth.gain.setTargetAtTime(-a * 0.32, t, 0.06);
     const speed = a > 0 ? 0.11 * (0.7 + a * 0.3) : 0;
     this.surroundOscX.frequency.setTargetAtTime(speed || 0.0001, t, 0.08);
     this.surroundOscZ.frequency.setTargetAtTime(speed || 0.0001, t, 0.08);
